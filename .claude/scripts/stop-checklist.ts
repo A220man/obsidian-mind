@@ -38,7 +38,9 @@
  * and the handed-over report are held under Claude Code's hook output cap
  * (lib/hook-io.ts).
  * The documented event name is the only branch — no agent sniffing and no
- * agent-specific argument.
+ * agent-specific argument. A field one agent spells differently is read under
+ * every spelling, so it means the same thing whoever sent it and never tells
+ * the agents apart (the re-entry flag below).
  *
  * Under the template's Claude Code mod (#264, lib/om-mod.ts) the mod presents
  * the report itself: it runs this script with `om_mod: "report"` to get the
