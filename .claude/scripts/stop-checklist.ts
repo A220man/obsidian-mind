@@ -109,6 +109,7 @@ if (omMod === "standdown") {
 // writeSilentHookOutput for why "sometimes silent, sometimes JSON" is the
 // weaker contract.
 // The mod's `report` run is not a re-entry: the mod decides when to ask.
+// Grok sends the flag only as `stopHookActive`, so both spellings count (#323).
 if ((input?.stop_hook_active === true || input?.stopHookActive === true) && omMod !== "report") {
 	writeSilentHookOutput();
 	process.exit(0);
