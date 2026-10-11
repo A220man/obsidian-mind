@@ -1,7 +1,8 @@
 /**
  * Integration tests for the shared Stop/SessionEnd hook entry point.
  * Locks the once-per-session Stop report, the always-on SessionEnd report,
- * stop_hook_active semantics, and the JSON output envelope.
+ * re-entry flag semantics (`stop_hook_active` or `stopHookActive`), and the
+ * JSON output envelope.
  *
  * Why Stop dedupes instead of moving to SessionEnd (#252): Stop fires after
  * every response on Claude Code and Codex, so an unconditional report repeats
@@ -379,6 +380,8 @@ describe("stop-checklist", () => {
 		assert.match(shownOf(stdout), /Wrap-up checklist:/);
 	});
 
+	// The disagreeing pairs pin "either spelling", which a `??` between the two
+	// keys would break.
 	for (const payload of [
 		{ stopHookActive: true },
 		{ stop_hook_active: false, stopHookActive: true },
@@ -392,17 +395,12 @@ describe("stop-checklist", () => {
 		});
 	}
 
-	for (const stopHookActive of [false, "true"]) {
-		test(`camelCase flag must be boolean true: ${JSON.stringify(stopHookActive)}`, () => {
-			const result = run({ ...stop("s-camel-normal"), stopHookActive });
-			assert.match(shownOf(result.stdout), /Wrap-up checklist:/);
+	for (const payload of [{ stop_hook_active: "true" }, { stopHookActive: "true" }]) {
+		test(`a string re-entry flag is not re-entry: ${JSON.stringify(payload)}`, () => {
+			const { stdout } = run({ ...stop("s-string"), ...payload });
+			assert.match(shownOf(stdout), /Wrap-up checklist:/);
 		});
 	}
-
-	test("string stop_hook_active is not re-entry", () => {
-		const { stdout } = run({ ...stop("s-string"), stop_hook_active: "true" });
-		assert.match(shownOf(stdout), /Wrap-up checklist:/);
-	});
 
 	test("SessionEnd reports every time — it is the last chance, not a turn", () => {
 		const root = vault("session-end", "Done.md");
@@ -573,13 +571,15 @@ describe("stop-checklist — om_mod (a Claude Code mod)", () => {
 		assert.equal(refreshed(result.stderr), true, "the mod's run replaces the hook's, refresh included");
 	});
 
-	test("report answers even on a re-entry event: the mod decides when to ask", () => {
-		const root = vault("ommod-reentry", "Done.md");
-		const result = run({ ...flagged("s-reentry", "report"), stop_hook_active: true }, { vault: root });
-		const envelope = envelopeOf(result.stdout) as { report?: { agentText: string } };
-		assert.ok(envelope.report, `expected a report, got ${result.stdout}`);
-		assert.match(envelope.report.agentText, /work\/active\/Done\.md/);
-	});
+	for (const flag of [{ stop_hook_active: true }, { stopHookActive: true }]) {
+		test(`report answers even on a re-entry event: the mod decides when to ask: ${JSON.stringify(flag)}`, () => {
+			const root = vault("ommod-reentry", "Done.md");
+			const result = run({ ...flagged("s-reentry", "report"), ...flag }, { vault: root });
+			const envelope = envelopeOf(result.stdout) as { report?: { agentText: string } };
+			assert.ok(envelope.report, `expected a report, got ${result.stdout}`);
+			assert.match(envelope.report.agentText, /work\/active\/Done\.md/);
+		});
+	}
 
 	test("report's key is the report's identity: stable for the same findings, different when they change", () => {
 		const root = vault("ommod-key", "Done.md");
